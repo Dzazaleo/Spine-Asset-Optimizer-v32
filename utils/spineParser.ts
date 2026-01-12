@@ -358,22 +358,50 @@ function findImage(
   availableFiles: Map<string, any>, 
   path: string
 ): { key: string; width: number; height: number; sourceWidth?: number; sourceHeight?: number; [key: string]: any } | undefined {
-  const normalizedPath = path.trim().replace(/\\/g, '/').toLowerCase();
+  // 1. Sanitize: Normalize slashes, lowercase, remove leading slashes
+  const normalizedPath = path.trim().replace(/\\/g, '/').toLowerCase().replace(/^\/+/, '');
   
-  if (availableFiles.has(normalizedPath)) {
-      const data = availableFiles.get(normalizedPath);
-      return { key: normalizedPath, ...data };
-  }
-
+  // 2. Prepare Candidates (path + extensions)
+  const candidates = [normalizedPath];
   if (normalizedPath.indexOf('.') === -1) {
       const extensions = ['.png', '.jpg', '.jpeg', '.webp'];
-      for (const ext of extensions) {
-          const testKey = normalizedPath + ext;
-          if (availableFiles.has(testKey)) {
-              const data = availableFiles.get(testKey);
-              return { key: testKey, ...data };
+      extensions.forEach(ext => candidates.push(normalizedPath + ext));
+  }
+
+  // 3. Optimization: Check for Exact Match First
+  for (const c of candidates) {
+      if (availableFiles.has(c)) {
+          const data = availableFiles.get(c);
+          return { key: c, ...data };
+      }
+  }
+
+  // 4. Iterative Boundary-Aware Suffix Match
+  let bestMatchKey: string | null = null;
+  let bestMatchLen = Infinity;
+
+  for (const fileKey of availableFiles.keys()) {
+      for (const candidate of candidates) {
+          if (fileKey.endsWith(candidate)) {
+              const startIdx = fileKey.length - candidate.length;
+              
+              // Boundary Check: match starts at 0 OR preceded by '/'
+              const isBoundaryValid = startIdx === 0 || fileKey[startIdx - 1] === '/';
+              
+              if (isBoundaryValid) {
+                  // Heuristic: Prefer the shortest path (closest to root)
+                  if (fileKey.length < bestMatchLen) {
+                      bestMatchLen = fileKey.length;
+                      bestMatchKey = fileKey;
+                  }
+              }
           }
       }
+  }
+
+  if (bestMatchKey) {
+      const data = availableFiles.get(bestMatchKey);
+      return { key: bestMatchKey, ...data };
   }
 
   return undefined;
