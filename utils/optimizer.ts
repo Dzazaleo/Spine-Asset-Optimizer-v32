@@ -42,16 +42,26 @@ export function calculateOptimizationTargets(
     targetH = Math.max(1, targetH);
     
     const isResize = targetW !== physicalW || targetH !== physicalH;
-    const sourcePath = original.originalPath;
-    const lastSlashIndex = Math.max(sourcePath.lastIndexOf('/'), sourcePath.lastIndexOf('\\'));
-    const lastDotIndex = sourcePath.lastIndexOf('.');
     
-    let basePath = sourcePath;
+    // Determine Output Filename
+    // Priority: Canonical Spine Path (stat.path) > Physical Path (original.originalPath)
+    // This ensures that if a user drags a folder "MyProject", the output ZIP structure 
+    // will be "images/gun.png" (Spine path) instead of "MyProject/images/gun.png".
+    
+    let canonicalPath = stat.path.trim().replace(/\\/g, '/');
+    // Remove leading slashes if any
+    canonicalPath = canonicalPath.replace(/^\/+/, '');
+    
+    // Handle Extension: Always output .png for optimized assets
+    const lastDotIndex = canonicalPath.lastIndexOf('.');
+    const lastSlashIndex = canonicalPath.lastIndexOf('/');
+    
     if (lastDotIndex > lastSlashIndex) {
-        basePath = sourcePath.substring(0, lastDotIndex);
+        // Strip existing extension
+        canonicalPath = canonicalPath.substring(0, lastDotIndex);
     }
         
-    const outputFileName = `${basePath}.png`;
+    const outputFileName = `${canonicalPath}.png`;
 
     tasks.push({
       fileName: outputFileName,
